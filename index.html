@@ -393,6 +393,47 @@ canvas#canvas {
   cursor: default;
 }
 
+/* ── Mobile responsive ────────────────────────────── */
+@media (max-width: 768px) {
+  :root { --sidebar-w: 100vw; }
+
+  body { overflow: auto; height: auto; }
+
+  #sidebar {
+    position: relative;
+    width: 100%;
+    border-right: none;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    padding: 16px 14px;
+    gap: 14px;
+  }
+
+  canvas#canvas {
+    position: relative;
+    left: 0;
+    width: 100vw !important;
+    height: 70vh !important;
+  }
+
+  #dashboard {
+    left: 0;
+    width: 100%;
+    top: 0;
+    bottom: 0;
+    z-index: 25;
+  }
+
+  #tooltip { display: none !important; }
+
+  .stat-section h3 { font-size: 11px; }
+  .stat-big { font-size: 24px; }
+
+  #sidebar h1 { font-size: 15px; }
+
+  .hbar-label { width: 58px; font-size: 9px; }
+  .tier-row { font-size: 10px; }
+}
+
 #tooltip {
   position: fixed;
   pointer-events: none;
@@ -678,10 +719,13 @@ function setView(view) {
   resize();
 }
 
+function isMobile() { return window.innerWidth <= 768; }
+
 function layout() {
-  const sidebarW = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--sidebar-w'));
-  const w = (window.innerWidth - sidebarW);
-  const h = window.innerHeight;
+  const mobile = isMobile();
+  const sidebarW = mobile ? 0 : parseInt(getComputedStyle(document.documentElement).getPropertyValue('--sidebar-w'));
+  const w = mobile ? window.innerWidth : (window.innerWidth - sidebarW);
+  const h = mobile ? Math.round(window.innerHeight * 0.7) : window.innerHeight;
 
   canvas.width = w * dpr;
   canvas.height = h * dpr;
@@ -786,9 +830,11 @@ function draw() {
 }
 
 function hitTest(mx, my) {
-  const sidebarW = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--sidebar-w'));
-  const cx = mx - sidebarW;
-  const cy = my;
+  const mobile = isMobile();
+  const sidebarW = mobile ? 0 : parseInt(getComputedStyle(document.documentElement).getPropertyValue('--sidebar-w'));
+  const canvasRect = canvas.getBoundingClientRect();
+  const cx = mx - canvasRect.left;
+  const cy = my - canvasRect.top;
   for (let i = rects.length - 1; i >= 0; i--) {
     const r = rects[i];
     if (cx >= r.rx && cx < r.rx + r.rw && cy >= r.ry && cy < r.ry + r.rh) {
@@ -858,9 +904,10 @@ function hideTooltip() {
 let colRects = [];
 
 function layoutColumns() {
-  const sidebarW = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--sidebar-w'));
-  const w = (window.innerWidth - sidebarW);
-  const h = window.innerHeight;
+  const mobile = isMobile();
+  const sidebarW = mobile ? 0 : parseInt(getComputedStyle(document.documentElement).getPropertyValue('--sidebar-w'));
+  const w = mobile ? window.innerWidth : (window.innerWidth - sidebarW);
+  const h = mobile ? Math.round(window.innerHeight * 0.7) : window.innerHeight;
 
   canvas.width = w * dpr;
   canvas.height = h * dpr;
@@ -1000,9 +1047,9 @@ function drawColumns() {
 }
 
 function hitTestColumns(mx, my) {
-  const sidebarW = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--sidebar-w'));
-  const cx = mx - sidebarW;
-  const cy = my;
+  const canvasRect = canvas.getBoundingClientRect();
+  const cx = mx - canvasRect.left;
+  const cy = my - canvasRect.top;
   for (let i = colRects.length - 1; i >= 0; i--) {
     const r = colRects[i];
     if (cx >= r.rx && cx < r.rx + r.rw && cy >= r.ry && cy < r.ry + r.rh) {
@@ -1176,6 +1223,18 @@ canvas.addEventListener("mouseleave", () => {
   currentView === "treemap" ? draw() : drawColumns();
 });
 
+// Touch support for mobile
+canvas.addEventListener("touchstart", (e) => {
+  e.preventDefault();
+  const touch = e.touches[0];
+  const hit = currentView === "treemap" ? hitTest(touch.clientX, touch.clientY) : hitTestColumns(touch.clientX, touch.clientY);
+  if (hit) {
+    hovered = hit;
+    currentView === "treemap" ? draw() : drawColumns();
+    openDashboard(hit);
+  }
+}, { passive: false });
+
 function resize() {
   dpr = window.devicePixelRatio || 1;
   if (currentView === "treemap") {
@@ -1261,16 +1320,20 @@ function openDashboard(d) {
     </div>`;
   }).join("") || '<div style="font-size:12px;color:var(--fg2)">No similar jobs found</div>';
 
-  // Shift canvas to account for dashboard
-  canvas.style.left = `calc(var(--sidebar-w) + 360px)`;
-  resize();
+  // Shift canvas to account for dashboard (desktop only)
+  if (!isMobile()) {
+    canvas.style.left = `calc(var(--sidebar-w) + 360px)`;
+    resize();
+  }
 }
 
 function closeDashboard() {
   dashboardJob = null;
   document.getElementById("dashboard").classList.remove("open");
-  canvas.style.left = `var(--sidebar-w)`;
-  resize();
+  if (!isMobile()) {
+    canvas.style.left = `var(--sidebar-w)`;
+    resize();
+  }
 }
 
 // ── Export report ─────────────────────────────────────────────────────
